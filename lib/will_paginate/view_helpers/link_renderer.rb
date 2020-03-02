@@ -8,7 +8,7 @@ module WillPaginate
     # This class does the heavy lifting of actually building the pagination
     # links. It is used by +will_paginate+ helper internally.
     class LinkRenderer < LinkRendererBase
-      
+
       # * +collection+ is a WillPaginate::Collection instance or any other object
       #   that conforms to that API
       # * +options+ are forwarded from +will_paginate+ view helper
@@ -17,6 +17,7 @@ module WillPaginate
         super(collection, options)
         @template = template
         @container_attributes = @base_url_params = nil
+        #@options[:forced_page]
       end
 
       # Process it! This method returns the complete HTML string which contains
@@ -25,10 +26,10 @@ module WillPaginate
       def to_html
         html = pagination.map do |item|
           item.is_a?(Integer) ?
-            page_number(item) :
-            send(item)
+              page_number(item) :
+              send(item)
         end.join(@options[:link_separator])
-        
+
         @options[:container] ? html_container(html) : html
       end
 
@@ -36,37 +37,42 @@ module WillPaginate
       # represent HTML attributes for the container element of pagination links.
       def container_attributes
         @container_attributes ||= {
-          :role => 'navigation',
-          :"aria-label" => @template.will_paginate_translate(:container_aria_label) { 'Pagination' }
+            :role => 'navigation',
+            :"aria-label" => @template.will_paginate_translate(:container_aria_label) { 'Pagination' }
         }.update @options.except(*(ViewHelpers.pagination_options.keys + [:renderer] - [:class]))
       end
-      
-    protected
-    
+
+      def get_correct_page(c_p)
+        return c_p unless @options[:forced_page].present?
+        @options[:forced_page].to_i
+      end
+
+      protected
+
       def page_number(page)
         aria_label = @template.will_paginate_translate(:page_aria_label, :page => page.to_i) { "Page #{page}" }
-        if page == current_page
+        if page == get_correct_page(current_page)
           tag(:em, page, :class => 'current', :"aria-label" => aria_label, :"aria-current" => 'page')
         else
           link(page, page, :rel => rel_value(page), :"aria-label" => aria_label)
         end
       end
-      
+
       def gap
         text = @template.will_paginate_translate(:page_gap) { '&hellip;' }
         %(<span class="gap">#{text}</span>)
       end
-      
+
       def previous_page
-        num = @collection.current_page > 1 && @collection.current_page - 1
+        num = get_correct_page(@collection.current_page) > 1 && get_correct_page(@collection.current_page) - 1
         previous_or_next_page(num, @options[:previous_label], 'previous_page')
       end
-      
+
       def next_page
-        num = @collection.current_page < total_pages && @collection.current_page + 1
+        num = get_correct_page(@collection.current_page) < total_pages && get_correct_page(@collection.current_page) + 1
         previous_or_next_page(num, @options[:next_label], 'next_page')
       end
-      
+
       def previous_or_next_page(page, text, classname)
         if page
           link(text, page, :class => classname)
@@ -74,18 +80,18 @@ module WillPaginate
           tag(:span, text, :class => classname + ' disabled')
         end
       end
-      
+
       def html_container(html)
         tag(:div, html, container_attributes)
       end
-      
+
       # Returns URL params for +page_link_or_span+, taking the current GET params
       # and <tt>:params</tt> option into account.
       def url(page)
         raise NotImplementedError
       end
-      
-    private
+
+      private
 
       def param_name
         @options[:param_name].to_s
@@ -99,7 +105,7 @@ module WillPaginate
         attributes[:href] = target
         tag(:a, text, attributes)
       end
-      
+
       def tag(name, value, attributes = {})
         string_attributes = attributes.inject('') do |attrs, pair|
           unless pair.last.nil?
@@ -112,8 +118,8 @@ module WillPaginate
 
       def rel_value(page)
         case page
-        when @collection.current_page - 1; 'prev'
-        when @collection.current_page + 1; 'next'
+        when get_correct_page(@collection.current_page) - 1; 'prev'
+        when get_correct_page(@collection.current_page) + 1; 'next'
         end
       end
 
